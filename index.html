@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head>
+<head><meta name="application-version" content="2026-11-24-mobile-memory-fix">
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#10151b">
 <title>SEGUNDO IMPACTO — Laboratório do caos</title>
@@ -456,7 +456,7 @@ function matchHUD(){
 function newMatch(){resetScoreCategories();mapOrder=developmentMapOrder();newsShots=[];roundIndex=1;roundScores=[];roundHits=[];roundDamage=[];roundCombos=[];setup();}
 function finishLaunch(missed=false){
   if(state!=='running')return;
-  recordReplayFrame(0,true);render();if(canvas.toDataURL)newsShots.push({score,image:canvas.toDataURL('image/png')});roundScores.push(score);roundHits.push(hitCount);roundDamage.push(damageTotal);roundCombos.push(maxCombo);
+  recordReplayFrame(0,true);if(!runtimeMobile)render();newsShots.push({score,image:lifecycleRoundThumbnail()});roundScores.push(score);roundHits.push(hitCount);roundDamage.push(damageTotal);roundCombos.push(maxCombo);
   state='between';transitionTime=0;$('endActions').hidden=false;$('cameraReplay').disabled=replayFrames.length<2;$('continueCrash').focus();
   $('status').textContent=missed?'PASSOU SEM BATER · '+(roundIndex<3?'PRÓXIMO LANÇAMENTO':'SOMANDO OS TRÊS LANÇAMENTOS'):'LANÇAMENTO '+roundIndex+' CONCLUÍDO · +'+fmt(score)+' PONTOS';
   $('comboPop').classList.add('show');$('comboPop').querySelector('strong').textContent=missed?'PASSOU DIRETO!':'+'+fmt(score)+' PONTOS';$('comboPop').querySelector('span').textContent=roundIndex<3?'PREPARANDO O LANÇAMENTO '+(roundIndex+1)+' DE 3':'PARTIDA CONCLUÍDA';
@@ -849,7 +849,7 @@ function updateCity(dt){
 }
 function prepareNews(total){
   const shot=[...newsShots].sort((a,b)=>b.score-a.score)[0];
-  if(shot)$('newsImage').src=shot.image;
+  if(shot?.image)$('newsImage').src=shot.image;
   const hits=roundHits.reduce((a,b)=>a+b,0);
   $('newsHeadline').textContent=hits?hits+' VEÍCULOS ENVOLVIDOS EM ACIDENTES':'TRÊS CENÁRIOS · BALANÇO DA PARTIDA';
   const ticker='MAIOR PONTUAÇÃO: '+fmt(highScore)+' PONTOS  •  IMPACTO NEWS  •  ';
@@ -1651,12 +1651,12 @@ function resetReplayState(){
   replayFrames=[];replayActive=false;replayView=false;replayClock=0;replayIndex=0;replayLastRender=-1;lastReplayCapture=-1;
   $('endActions').hidden=true;$('cameraReplay').innerHTML='<span aria-hidden="true">📷</span> REPLAY';document.body?.classList.remove('security-replay');
 }
-function startReplayRecording(){replayFrames=[];lastReplayCapture=-1;replayCaptureInterval=1/12;recordReplayFrame(0,true)}
+function startReplayRecording(){replayFrames=[];lastReplayCapture=-1;replayCaptureInterval=runtimeMobile?1/8:1/12;recordReplayFrame(0,true)}
 function recordReplayFrame(dt,force=false){
   if(state!=='running'||!force&&elapsed-lastReplayCapture<replayCaptureInterval)return;
   lastReplayCapture=elapsed;
-  replayFrames.push({time:elapsed,worldTime,waterSources:waterSources.map(plainRecord),stationFires:stationFires.map(plainRecord),bridgeFalls:bridgeFalls.map(plainRecord),wheels:looseWheels.map(plainRecord),cars:cars.map(plainRecord),people:people.map(plainRecord),riders:riders.map(plainRecord),pipes:pipes.map(plainRecord),pigeons:pigeons.map(plainRecord),rubble:rubble.map(snapshotRubblePiece),blood:bloodMarks.map(plainRecord),marks:marks.slice(-MAX_BRAKE_MARKS).map(snapshotSkidMark),particles:particles.slice(-220).map(plainRecord),effects:explosionEffects.map(plainRecord),destroyed:scenery.map(s=>Boolean(s.destroyed)),cranes:fallenCranes.map(item=>({index:scenery.indexOf(item.s),tilt:item.tilt,direction:{...item.direction}}))});
-  if(replayFrames.length>360){const last=replayFrames[replayFrames.length-1];replayFrames=replayFrames.filter((frame,index)=>index%2===0);if(replayFrames[replayFrames.length-1]!==last)replayFrames.push(last);replayCaptureInterval*=2;}
+  replayFrames.push({time:elapsed,worldTime,waterSources:waterSources.map(plainRecord),stationFires:stationFires.map(plainRecord),bridgeFalls:bridgeFalls.map(plainRecord),wheels:looseWheels.map(plainRecord),cars:cars.map(plainRecord),people:people.map(plainRecord),riders:riders.map(plainRecord),pipes:pipes.map(plainRecord),pigeons:pigeons.map(plainRecord),rubble:rubble.map(snapshotRubblePiece),blood:bloodMarks.map(plainRecord),marks:marks.slice(-MAX_BRAKE_MARKS).map(snapshotSkidMark),particles:particles.slice(runtimeMobile?-70:-220).map(plainRecord),effects:explosionEffects.map(plainRecord),destroyed:scenery.map(s=>Boolean(s.destroyed)),cranes:fallenCranes.map(item=>({index:scenery.indexOf(item.s),tilt:item.tilt,direction:{...item.direction}}))});
+  if(replayFrames.length>(runtimeMobile?180:360)){const last=replayFrames[replayFrames.length-1];replayFrames=replayFrames.filter((frame,index)=>index%2===0);if(replayFrames[replayFrames.length-1]!==last)replayFrames.push(last);replayCaptureInterval*=2;}
 }
 function toggleSecurityReplay(){
   if(state!=='between'||!replayFrames.length)return;
@@ -2774,11 +2774,11 @@ function drawFinishedVehicle(c){
     const corners=[];for(const u of [-c.l/2-16,c.l/2+16])for(const v of [-c.w/2-12,c.w/2+12])for(const z of [-4,Math.max(c.h+16,64)])corners.push(project(...carPoint(c,u,v,z)));
     const left=Math.floor(Math.min(...corners.map(p=>p.x)))-2,top=Math.floor(Math.min(...corners.map(p=>p.y)))-2,width=Math.ceil(Math.max(...corners.map(p=>p.x))-left)+4,height=Math.ceil(Math.max(...corners.map(p=>p.y))-top)+4,image=document.createElement('canvas');image.width=Math.ceil(width*DPR);image.height=Math.ceil(height*DPR);
     const original=ctx,oldOx=ox,oldOy=oy;ctx=image.getContext('2d');ctx.setTransform(DPR,0,0,DPR,0,0);ox-=left;oy-=top;try{drawCar(c);drawVehicleFinish(c)}finally{ctx=original;ox=oldOx;oy=oldOy}
-    cached={image,dx:left-p.x,dy:top-p.y,width,height};if(vehicleFinishCache.size>=128)vehicleFinishCache.delete(vehicleFinishCache.keys().next().value);vehicleFinishCache.set(key,cached);
+    cached={image,dx:left-p.x,dy:top-p.y,width,height};if(vehicleFinishCache.size>=(runtimeMobile?40:128)){const oldest=vehicleFinishCache.keys().next().value,evicted=vehicleFinishCache.get(oldest);evicted.image.width=1;evicted.image.height=1;vehicleFinishCache.delete(oldest)};vehicleFinishCache.set(key,cached);
   }
   ctx.drawImage(cached.image,p.x+cached.dx,p.y+cached.dy,cached.width,cached.height);
 }
-const asphaltFinishes=new Map(),grainPatterns=new WeakMap();let finishGrainTile=null;
+let asphaltFinishes=new Map(),grainPatterns=new WeakMap();let finishGrainTile=null;
 function drawRoadMaterial(){
   if(replayView)return;
   let image=asphaltFinishes.get(SUN.key);
@@ -2907,7 +2907,7 @@ function emitBuildingDust(s,b,force){
 
 // Full-resolution caches for the fixed CCTV camera. Draw ordering and recorded
 // simulation snapshots stay unchanged; moving entities are still drawn live.
-const cctvSpriteCache=new Map(),cctvCraneGeometry=new WeakMap();
+let cctvSpriteCache=new Map(),cctvCraneGeometry=new WeakMap();
 let cctvCachePixels=0,cctvCacheEpoch='',cctvGroundImage=null,cctvScreenImage=null,cctvLightSignature='',cctvGroundLightKey='';
 function cctvEnvironmentKey(){return[citySerial,SUN.key,W,H,DPR].join('|')}
 function prepareCCTVCache(){
@@ -2929,10 +2929,10 @@ function drawCCTVCached(key,bounds,draw){
     if(width<=0||height<=0)return;
     const image=document.createElement('canvas');image.width=Math.ceil(width*DPR);image.height=Math.ceil(height*DPR);const pixels=image.width*image.height;
     // Bound GPU/native memory without downscaling any cached image.
-    if(pixels>8000000){draw();return}
+    if(pixels>(runtimeMobile?2400000:8000000)){draw();return}
     const original=ctx;ctx=image.getContext('2d');ctx.setTransform(DPR,0,0,DPR,-left*DPR,-top*DPR);
     try{draw()}finally{ctx=original}
-    while(cctvCachePixels+pixels>8000000&&cctvSpriteCache.size){const oldest=cctvSpriteCache.keys().next().value;cctvCachePixels-=cctvSpriteCache.get(oldest).pixels;cctvSpriteCache.delete(oldest)}
+    while(cctvCachePixels+pixels>(runtimeMobile?2400000:8000000)&&cctvSpriteCache.size){const oldest=cctvSpriteCache.keys().next().value;const evicted=cctvSpriteCache.get(oldest);cctvCachePixels-=evicted.pixels;evicted.image.width=1;evicted.image.height=1;cctvSpriteCache.delete(oldest)}
     entry={image,left,top,width,height,pixels};cctvSpriteCache.set(key,entry);cctvCachePixels+=pixels;
   }
   ctx.drawImage(entry.image,entry.left,entry.top,entry.width,entry.height);
@@ -3152,7 +3152,7 @@ function drawFastFoodRestaurant(s){
 // Keep ground slabs, vertical supports and elevated foliage/roofs in distinct
 // depth entries. A large transparent sprite must not bring its floor forward.
 let sceneryGeometryCapture=null,groundedLayerEpoch='',groundedLayerPixels=0;
-const groundedGeometry=new WeakMap(),groundedLayerSprites=new Map();
+let groundedGeometry=new WeakMap(),groundedLayerSprites=new Map();
 function groundedTreeHeight(x,y,size){return[95,110,104,103,115,92,25][Math.floor(seeded(x,y)*7)]*size}
 function captureSceneryPrimitive(bounds,draw,kind='detail'){sceneryGeometryCapture.push({bounds,draw,kind});}
 const groundedRawPoly=poly;poly=function(points,color,stroke){if(sceneryGeometryCapture){captureSceneryPrimitive(renderBounds(points),()=>groundedRawPoly(points,color,stroke));return}groundedRawPoly(points,color,stroke)};
@@ -3262,7 +3262,7 @@ function installViewportGuards(){
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)stabilizeGameViewport()});
 }
 
-const crtNoiseTiles=[],crtNoisePatterns=new WeakMap();
+let crtNoiseTiles=[],crtNoisePatterns=new WeakMap();
 function drawCCTVInterference(frame){
   if(!crtNoiseTiles.length)for(let phase=0;phase<4;phase++){
     const tile=document.createElement('canvas');tile.width=128;tile.height=128;const c=tile.getContext('2d'),data=c.createImageData(128,128);
@@ -3841,7 +3841,7 @@ function addBeachDetails(){
   }
   const x=-275;people.push({x,y:coastRoadY(x)+266,z:-137.5,angle:0,dir:1,fleeDir:1,speed:30,phase:0,coat:'#c78a4c',dog:true,beachDog:true});
 }
-const umbrellaLayers=sceneryRenderLayers,umbrellaLayerCache=new WeakMap();sceneryRenderLayers=function(s){
+let umbrellaLayers=sceneryRenderLayers,umbrellaLayerCache=new WeakMap();sceneryRenderLayers=function(s){
   const parts=umbrellaLayers(s);if(s.category!=='beachUmbrella')return parts;
   if(umbrellaLayerCache.has(s))return umbrellaLayerCache.get(s);
   const post=parts.filter(p=>p.bounds.minZ< -108),canopy=parts.filter(p=>p.bounds.minZ>=-108);
@@ -4893,7 +4893,7 @@ function updateNewsReplayButtons(){
     const button=$('newsReplay'+(i+1)),entry=newsReplayArchive[i],image=$('newsReplayThumb'+(i+1));
     button.disabled=!entry?.frames.length;button.setAttribute('aria-pressed',String(i===newsReplayChoice));
     button.setAttribute('aria-label','Rever acidente '+(i+1)+(entry?' · '+entry.environment.sun.key+' · '+fmt(entry.score)+' pontos':''));
-    const shot=newsShots[i];if(shot)image.src=shot.image;
+    const shot=newsShots[i];if(shot?.image)image.src=shot.image;
     $('newsReplayTime'+(i+1)).textContent=entry?.environment.sun.key||'—';
   }
 }
@@ -5773,7 +5773,7 @@ drawCinematicAtmosphere = function() {
 // Winter diorama art pass. All assets remain procedural and embedded in HTML.
 const winterGround=drawCoastalGround,winterBuild=buildCoastalDistrict,winterLighting=setLightingPreset,winterShadows=drawSunShadows,winterBounds=sceneryRenderBounds,winterPine=drawSnowPine;
 const winterGroundLayers=new Map(),winterBackdrops=new Map();
-const winterDrawScenery=drawScenery,winterCastShadow=castScenerySunShadow,winterSceneryImages=new WeakMap();
+let winterDrawScenery=drawScenery,winterCastShadow=castScenerySunShadow,winterSceneryImages=new WeakMap();
 const winterHeight=coastHeight,winterCityUpdate=updateCity,winterVehicleLights=drawVehicleNightLights;
 let winterCamps=[];
 coastHeight=function(x,y){
@@ -7917,7 +7917,9 @@ function runtimeDPR(w,h){
 const runtimeGround=drawGround,runtimeCityGround=new Map();let runtimeBridgeLayer=null,runtimeBridgeStamp='';
 drawGround=function(){
   if(activeMap===1&&runtimeMobile&&runtimeQuality===0&&!replayView){
-    const key=[citySerial,SUN.key,W,H,DPR,Math.floor(worldTime*12),bridgeNav?.holes?.map(h=>h.crumbled?1:0).join('')].join('|');
+    // Slow-moving marine scenery has its own low-cost refresh; road traffic,
+    // sparks, buoys and the simulation retain the main 24 Hz clock.
+    const key=[citySerial,SUN.key,W,H,DPR,Math.floor(worldTime*6),bridgeNav?.holes?.map(h=>h.crumbled?1:0).join('')].join('|');
     if(key!==runtimeBridgeStamp){
       const old=ctx,oldDPR=DPR;
       if(!runtimeBridgeLayer||runtimeBridgeLayer.width!==Math.ceil(W*DPR)||runtimeBridgeLayer.height!==Math.ceil(H*DPR)){runtimeBridgeLayer=document.createElement('canvas');runtimeBridgeLayer.width=Math.ceil(W*DPR);runtimeBridgeLayer.height=Math.ceil(H*DPR);}
@@ -7938,7 +7940,7 @@ drawGround=function(){
 };
 
 // Blur reflected steel once, not once per animated water strip per frame.
-const runtimeBlurredReflections=new WeakMap();
+let runtimeBlurredReflections=new WeakMap();
 drawBayReflections=function(){
   const epoch=[citySerial,SUN.key,W,H,DPR,scale,ox,oy,replayView,SECURITY_POLE.x,SECURITY_POLE.y].join('|');
   let layer=bayReflections.get(epoch);
@@ -8077,6 +8079,79 @@ render=function(){
 };
 const runtimeSpawn=spawnCar;
 spawnCar=function(...args){if(runtimeMobile&&cars.filter(c=>!c.rock&&!c.cargo&&!c.tram&&!c.snowHeli).length>=28)return null;return runtimeSpawn(...args);};
+
+// Canvas backing stores must be released before allocating the next map.
+// Weak references do not retain evicted sprites during a long accident.
+const lifecycleCreateElement=document.createElement.bind(document),lifecycleSurfaces=[];
+document.body.classList.toggle('mobile-budget',runtimeMobile);
+const lifecycleMobileStyle=document.createElement('style');
+lifecycleMobileStyle.textContent='.mobile-budget .minimal-hud>div,.mobile-budget .event-points,.mobile-budget #mapStartTitle{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background-color:#21363e}.mobile-budget .arena:after{box-shadow:inset 0 0 36px #0b111833}';
+document.head.appendChild(lifecycleMobileStyle);
+document.createElement=function(name,...args){
+  const element=lifecycleCreateElement(name,...args);
+  if(String(name).toLowerCase()==='canvas'&&typeof WeakRef==='function')lifecycleSurfaces.push(new WeakRef(element));
+  return element;
+};
+function lifecycleReleaseGraphics(){
+  const clear=cache=>{
+    for(const value of cache.values()){
+      const image=value?.image||value;
+      if(image instanceof HTMLCanvasElement&&image!==canvas){image.width=1;image.height=1;}
+    }
+    cache.clear();
+  };
+  for(const weak of lifecycleSurfaces){const image=weak.deref();if(image&&image!==canvas){image.width=1;image.height=1;}}
+  lifecycleSurfaces.length=0;
+  for(const cache of [sceneryCache,staticSunShadows,visualGroundCache,vehicleFinishCache,asphaltFinishes,smokeSprites,cctvSpriteCache,groundedLayerSprites,perfGroundImages,escapeStaticShadows,winterGroundLayers,winterBackdrops,bayReflections,bayShadowLayers,bridgeBackdrops,stationRailImages,santaCityImages,runtimeCityGround])clear(cache);
+  clearRubbleSprites();
+  for(const image of [sunShadowMask,bayShadowMask,escapeMovingShadowMask,cctvGroundImage,cctvScreenImage,runtimeBridgeLayer,finishGrainTile,...crtNoiseTiles])if(image){image.width=1;image.height=1;}
+  sunShadowMask=null;bayShadowMask=null;escapeMovingShadowMask=null;cctvGroundImage=null;cctvScreenImage=null;runtimeBridgeLayer=null;runtimeBridgeStamp='';finishGrainTile=null;
+  crtNoiseTiles.length=0;
+  winterSceneryImages=new WeakMap();groundedGeometry=new WeakMap();cctvCraneGeometry=new WeakMap();umbrellaLayerCache=new WeakMap();grainPatterns=new WeakMap();crtNoisePatterns=new WeakMap();runtimeBlurredReflections=new WeakMap();
+  groundedLayerPixels=0;groundedLayerEpoch='';cctvCachePixels=0;cctvCacheEpoch='';
+  cablePieceCache.clear();perfShadowPoints.clear();runtimeShadowHeights.clear();sunColorCache.clear();
+}
+const lifecycleSetup=setup;
+setup=function(){lifecycleReleaseGraphics();lifecycleSetup();};
+
+function lifecycleRoundThumbnail(){
+  const image=document.createElement('canvas');image.width=runtimeMobile?320:640;image.height=Math.max(1,Math.round(image.width*canvas.height/canvas.width));
+  try{const b=image.getContext('2d');if(!b)return'';b.drawImage(canvas,0,0,image.width,image.height);return image.toDataURL('image/jpeg',.72);}catch(error){console.warn('Round thumbnail unavailable',error);return'';}finally{image.width=1;image.height=1;}
+}
+
+let mobileTransitionPending=false,mobileTransitionFailed=false;
+const lifecycleContinue=continueAfterCrash;
+$('continueCrash').removeEventListener('click',lifecycleContinue);
+$('continueCrash').addEventListener('click',()=>continueAfterCrash());
+const lifecycleTransition=document.createElement('div');lifecycleTransition.hidden=true;
+lifecycleTransition.setAttribute('role','status');
+lifecycleTransition.style.cssText='position:fixed;inset:0;z-index:70;background:#10262de8;display:grid;place-items:center;color:#eaf6fa;font:600 16px Arial;text-align:center;padding:24px';
+// The hidden attribute must override the inline display declaration.
+lifecycleTransition.style.display='none';document.body.appendChild(lifecycleTransition);
+continueAfterCrash=function(){
+  if(mobileTransitionPending||state!=='between')return;
+  if(!runtimeMobile||roundIndex===3){lifecycleContinue();return;}
+  mobileTransitionPending=true;const previousPause=sessionPaused,previousRound=roundIndex;
+  mobileTransitionFailed=false;
+  sessionPaused=true;stopSecurityReplay();$('continueCrash').disabled=true;
+  lifecycleTransition.textContent='Preparando próxima fase…';lifecycleTransition.hidden=false;lifecycleTransition.style.display='grid';
+  setTimeout(()=>{
+    try{lifecycleContinue();}
+    catch(error){
+      roundIndex=previousRound;state='between';mobileTransitionFailed=true;$('endActions').hidden=false;console.error('Map transition failed',error);
+      const panel=document.createElement('div'),message=document.createElement('p'),retry=document.createElement('button');
+      message.textContent='Não foi possível abrir a próxima fase.';retry.textContent='TENTAR NOVAMENTE';retry.style.cssText='margin-top:16px;padding:14px 22px;border:0;border-radius:8px;background:#b7eaff;color:#102b3e;font-weight:700';
+      retry.onclick=()=>continueAfterCrash();panel.append(message,retry);lifecycleTransition.replaceChildren(panel);
+    }
+    finally{
+      mobileTransitionPending=false;sessionPaused=previousPause;$('continueCrash').disabled=false;
+      if(!mobileTransitionFailed){lifecycleTransition.hidden=true;lifecycleTransition.style.display='none';}
+      prev=performance.now();physicsAccumulator=0;drawDeadline=prev+GAME_RENDER_INTERVAL;
+    }
+  },60);
+};
+const lifecycleRender=render;
+render=function(){if(!mobileTransitionPending&&!mobileTransitionFailed)lifecycleRender();};
 
 let prev=0,drawTimerStarted=false,drawDeadline=0,physicsAccumulator=0;
 const GAME_RENDER_FPS=24,GAME_RENDER_INTERVAL=1000/GAME_RENDER_FPS;
